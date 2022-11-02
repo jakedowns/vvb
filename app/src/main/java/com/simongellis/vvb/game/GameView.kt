@@ -109,13 +109,9 @@ class GameView : ConstraintLayout, BacklightModeListener {
     /** BacklightModeListener Interface requirement  */
     override fun onBacklightModeChanged(backlightMode: BacklightMode) {
         if (_preferences.isLeia) {
-            val emulator = Emulator.instance
-            if (backlightMode == MODE_2D) {
-                // in 2D mode, just display one eye
-                _renderer.swapRenderer(MonoRenderer(emulator, _preferences.monoSettings(Eye.LEFT)))
-            } else {
-                _renderer.swapRenderer(LeiaRenderer(emulator, _preferences.leiaSettings))
-            }
+            //val emulator = Emulator.instance
+            // in 2D mode, just display one eye
+            _renderer.onModeChanged(backlightMode == BacklightMode.MODE_3D);
         }
     }
 
@@ -124,13 +120,13 @@ class GameView : ConstraintLayout, BacklightModeListener {
             return
         }
         if (desiredState && _preferences.isLeia) {
-            enable3D()
+            enable3d()
         } else {
             disable3D()
         }
     }
 
-    private fun enable3D() {
+    private fun enable3d() {
         mDisplayManager?.requestBacklightMode(MODE_3D)
     }
 

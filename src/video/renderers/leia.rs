@@ -20,6 +20,19 @@ void main() {
 }
 ";
 
+const FRAGMENT_SHADER_2D: &str = "\
+precision mediump float;
+uniform vec4 u_Colors[2];
+uniform sampler2D u_Textures[2];
+varying vec2 v_TexCoord;
+
+void main()
+{
+    // use left eye in 2D mode
+    gl_FragColor = texture2D(u_Textures[0], v_TexCoord);
+}
+";
+
 const FRAGMENT_SHADER: &str = "\
 precision mediump float;
 uniform vec4 u_Colors[2];
@@ -80,6 +93,19 @@ impl LeiaRenderLogic {
             transform: Matrix4::from_translation(vec3(0.0, offset, 0.0))
                 * Matrix4::from_scale(scale),
         }
+    }
+
+    pub fn on_mode_changed(&mut self, enable3d: bool) -> Result<()> {
+        if enable3d {
+            self.program.set_program(
+                VERTEX_SHADER,
+                FRAGMENT_SHADER)?;
+        }else{
+            self.program.set_program(
+                VERTEX_SHADER,
+                FRAGMENT_SHADER_2D)?;
+        }
+        Ok(())
     }
 }
 impl RenderLogic for LeiaRenderLogic {
@@ -143,7 +169,7 @@ pub mod jni {
     use crate::video::renderers::common::Renderer;
     use crate::{jni_func, jni_helpers};
     use anyhow::Result;
-    use jni::sys::{jint, jobject};
+    use jni::sys::{jboolean, jint, jobject};
     use jni::JNIEnv;
 
     type LeiaRenderer = Renderer<LeiaRenderLogic>;
@@ -208,5 +234,11 @@ pub mod jni {
     fn on_draw_frame(env: &JNIEnv, this: jobject) -> Result<()> {
         let mut this = get_renderer(env, this)?;
         this.on_draw_frame()
+    }
+
+    jni_func!(LeiaRenderer_nativeOnModeChanged, on_mode_changed, jboolean);
+    fn on_mode_changed(env: &JNIEnv, this: jobject, enable3d: jboolean) -> Result<()> {
+        let mut this = get_renderer(env, this)?;
+        this.on_mode_changed(enable3d != 0)
     }
 }

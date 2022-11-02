@@ -8,6 +8,7 @@ pub trait RenderLogic {
     fn draw(&self) -> Result<()>;
 }
 
+
 pub struct Renderer<TLogic: RenderLogic> {
     frame_buffers: FrameBufferConsumers,
     pub logic: TLogic,
@@ -41,5 +42,9 @@ impl<TLogic: RenderLogic> Renderer<TLogic> {
                 log::error!("Error updating eye!");
             }
         });
+    }
+
+    pub fn on_mode_changed(&mut self, _enable3d: bool) -> Result<()> {
+        Ok(())
     }
 }

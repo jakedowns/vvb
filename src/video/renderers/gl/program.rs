@@ -218,6 +218,36 @@ impl Program {
             check_error("render a texture")
         }
     }
+    pub fn set_program(&mut self, vertex_shader: &'static str, fragment_shader: &'static str) -> Result<()> {
+        unsafe {
+            // delete old shader program
+            if gl::IsProgram(self.id) == GL_TRUE {
+                gl::DeleteProgram(self.id)
+            }
+
+            self.vertex_shader = vertex_shader;
+            self.fragment_shader = fragment_shader;
+
+            // init new shader program
+            self.id = gl::CreateProgram();
+            check_error("create a program")?;
+
+            let vertex_shader = make_shader(gl::VERTEX_SHADER, self.vertex_shader)?;
+            gl::AttachShader(self.id, vertex_shader);
+            check_error("attach the vertex shader")?;
+
+            let fragment_shader = make_shader(gl::FRAGMENT_SHADER, self.fragment_shader)?;
+            gl::AttachShader(self.id, fragment_shader);
+            check_error("attach the fragment shader")?;
+
+            gl::LinkProgram(self.id);
+            check_error("link a program")?;
+            gl::UseProgram(self.id);
+            check_error("use a program")?;
+
+            Ok(())
+        }
+    }
     fn cleanup(&mut self) -> Result<()> {
         unsafe {
             if gl::IsProgram(self.id) == GL_TRUE {

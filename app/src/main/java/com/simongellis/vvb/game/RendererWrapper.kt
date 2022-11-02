@@ -17,6 +17,12 @@ class RendererWrapper(private var _renderer: Renderer) : Renderer {
         _lock.write { _renderer.destroy() }
     }
 
+    override fun onModeChanged(enable3d: Boolean) {
+        _lock.write {
+            _renderer.onModeChanged(enable3d)
+        }
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         _lock.read { _renderer.onSurfaceCreated(gl, config) }
     }
