@@ -18,7 +18,7 @@ class RendererWrapper(private var _renderer: Renderer) : Renderer {
     }
 
     override fun onModeChanged(enable3d: Boolean) {
-        _lock.write {
+        _lock.read {
             _renderer.onModeChanged(enable3d)
         }
     }

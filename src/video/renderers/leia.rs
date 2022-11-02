@@ -31,6 +31,8 @@ void main()
 {
     // use left eye in 2D mode
     gl_FragColor = texture2D(u_Textures[0], v_TexCoord);
+    // apply user color palette
+    gl_FragColor = mix(u_Colors[1], u_Colors[0], gl_FragColor.g);
 }
 ";
 
@@ -60,7 +62,10 @@ void main()
 
 pub struct LeiaRenderLogic {
     program: Program,
+    program_2d: Program,
     textures: Textures,
+
+    enable3d: bool,
 
     position_location: GLuint,
     tex_coord_location: GLuint,
@@ -71,20 +76,36 @@ pub struct LeiaRenderLogic {
     texture_colors: [[GLfloat; 4]; 2],
     aspect_ratio: AspectRatio,
     transform: Matrix4<GLfloat>,
+
+    prog_2d_position_location: GLuint,
+    prog_2d_tex_coord_location: GLuint,
+    prog_2d_modelview_location: GLint,
+    prog_2d_textures_location: GLint,
+    prog_2d_colors_location: GLint,
 }
 impl LeiaRenderLogic {
     pub fn new(settings: &Settings) -> Self {
         let scale = settings.screen_zoom;
         let offset = -settings.vertical_offset;
         Self {
-            program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER_2D),
+            program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER_4V),
             textures: Textures::new(2, (VB_WIDTH, VB_HEIGHT)),
+
+            enable3d: false,
 
             position_location: 0,
             tex_coord_location: 0,
             modelview_location: -1,
             textures_location: -1,
             colors_location: -1,
+
+            // trying initializing both for faster switching
+            program_2d: Program::new(VERTEX_SHADER, FRAGMENT_SHADER_2D),
+            prog_2d_position_location: 0,
+            prog_2d_tex_coord_location: 0,
+            prog_2d_modelview_location: -1,
+            prog_2d_textures_location: -1,
+            prog_2d_colors_location: -1,
 
             texture_colors: [
                 utils::color_as_vector(settings.colors[0]),
@@ -99,6 +120,7 @@ impl LeiaRenderLogic {
 impl RenderLogic for LeiaRenderLogic {
     fn init(&mut self) -> Result<()> {
         self.program.init()?;
+        self.program_2d.init()?;
         self.textures.init()?;
 
         self.position_location = self.program.get_attribute_location("a_Pos");
@@ -107,17 +129,31 @@ impl RenderLogic for LeiaRenderLogic {
         self.textures_location = self.program.get_uniform_location("u_Textures");
         self.colors_location = self.program.get_uniform_location("u_Colors");
 
+        self.prog_2d_position_location = self.program_2d.get_attribute_location("a_Pos");
+        self.prog_2d_tex_coord_location = self.program_2d.get_attribute_location("a_TexCoord");
+        self.prog_2d_modelview_location = self.program_2d.get_uniform_location("u_MV");
+        self.prog_2d_textures_location = self.program_2d.get_uniform_location("u_Textures");
+        self.prog_2d_colors_location = self.program_2d.get_uniform_location("u_Colors");
+
         // textures and colors don't change, set them here
         self.program
             .set_uniform_texture_array(self.textures_location, &self.textures.ids);
         self.program
             .set_uniform_vector_array(self.colors_location, &self.texture_colors);
 
+        // 2d
+        self.program_2d
+            .set_uniform_texture_array(self.prog_2d_textures_location, &self.textures.ids);
+        self.program_2d
+            .set_uniform_vector_array(self.prog_2d_colors_location, &self.texture_colors);
+
         Ok(())
     }
 
     fn resize(&mut self, screen_size: (i32, i32)) -> Result<()> {
         self.program.set_viewport(screen_size)?;
+
+        self.program_2d.set_viewport(screen_size)?;
 
         //let base_mv = utils::base_model_view(screen_size, (VB_WIDTH, VB_HEIGHT));
         let base_mv = self
@@ -129,6 +165,9 @@ impl RenderLogic for LeiaRenderLogic {
         self.program
             .set_uniform_matrix(self.modelview_location, &model_view);
 
+        self.program_2d
+            .set_uniform_matrix(self.modelview_location, &model_view);
+
         Ok(())
     }
 
@@ -136,26 +175,40 @@ impl RenderLogic for LeiaRenderLogic {
         self.textures.update(eye as usize, buffer)
     }
     fn draw(&self) -> Result<()> {
-        self.program.start_render()?;
-        self.program
-            .draw_square(self.position_location, self.tex_coord_location)
+        if self.enable3d {
+            self.program.start_render()?;
+            self.program
+                .draw_square(self.position_location, self.tex_coord_location)
+        } else {
+            self.program_2d.start_render()?;
+            self.program_2d
+                .draw_square(self.prog_2d_position_location, self.prog_2d_tex_coord_location)
+        }
+
     }
 
     fn change_mode(&mut self, enable3d: bool) -> Result<()> {
-        info!("leia change mode enable3d: {:?}",enable3d);
-        self.program.cleanup();
-        if enable3d {
-            self.program = Program::new(VERTEX_SHADER, FRAGMENT_SHADER_4V);
-            // self.program.set_program(
-            //     VERTEX_SHADER,
-            //     FRAGMENT_SHADER_4V)?;
-        }else{
-            self.program = Program::new(VERTEX_SHADER, FRAGMENT_SHADER_2D);
-            // self.program.set_program(
-            //     VERTEX_SHADER,
-            //     FRAGMENT_SHADER_2D)?;
-        }
-        self.init()?;
+        self.enable3d = enable3d;
+        // info!("leia change mode enable3d: {:?}",enable3d);
+        // self.program.cleanup()?;
+        // if enable3d {
+        //     // self.program = Program::new(VERTEX_SHADER, FRAGMENT_SHADER_4V);
+        //     self.program.set_program(
+        //         VERTEX_SHADER,
+        //         FRAGMENT_SHADER_4V)?;
+        // }else{
+        //     // self.program = Program::new(VERTEX_SHADER, FRAGMENT_SHADER_2D);
+        //     self.program.set_program(
+        //         VERTEX_SHADER,
+        //         FRAGMENT_SHADER_2D)?;
+        // }
+        // info!("leia change mode about to reinit");
+        // self.init()?;
+
+        // clear both
+        self.program.start_render()?;
+        self.program_2d.start_render()?;
+
         Ok(())
     }
 }
