@@ -7,6 +7,7 @@ use super::gl::{
 };
 use crate::video::gl::types::{GLfloat, GLint, GLuint};
 use anyhow::Result;
+use log::{info};
 use cgmath::{vec3, Matrix4};
 
 const VERTEX_SHADER: &str = "\
@@ -94,19 +95,6 @@ impl LeiaRenderLogic {
                 * Matrix4::from_scale(scale),
         }
     }
-
-    pub fn on_mode_changed(&mut self, enable3d: bool) -> Result<()> {
-        if enable3d {
-            self.program.set_program(
-                VERTEX_SHADER,
-                FRAGMENT_SHADER)?;
-        }else{
-            self.program.set_program(
-                VERTEX_SHADER,
-                FRAGMENT_SHADER_2D)?;
-        }
-        Ok(())
-    }
 }
 impl RenderLogic for LeiaRenderLogic {
     fn init(&mut self) -> Result<()> {
@@ -151,6 +139,20 @@ impl RenderLogic for LeiaRenderLogic {
         self.program.start_render()?;
         self.program
             .draw_square(self.position_location, self.tex_coord_location)
+    }
+
+    fn change_mode(&mut self, enable3d: bool) -> Result<()> {
+        info!("change mode override {:?}",enable3d);
+        if enable3d {
+            self.program.set_program(
+                VERTEX_SHADER,
+                FRAGMENT_SHADER)?;
+        }else{
+            self.program.set_program(
+                VERTEX_SHADER,
+                FRAGMENT_SHADER_2D)?;
+        }
+        Ok(())
     }
 }
 

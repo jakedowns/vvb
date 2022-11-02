@@ -6,6 +6,9 @@ pub trait RenderLogic {
     fn resize(&mut self, screen_size: (i32, i32)) -> Result<()>;
     fn update(&mut self, eye: Eye, buffer: &[u8]) -> Result<()>;
     fn draw(&self) -> Result<()>;
+    fn change_mode(&mut self, _enable3d: bool) -> Result<()> {
+        Ok(())
+    }
 }
 
 
@@ -44,7 +47,7 @@ impl<TLogic: RenderLogic> Renderer<TLogic> {
         });
     }
 
-    pub fn on_mode_changed(&mut self, _enable3d: bool) -> Result<()> {
-        Ok(())
+    pub fn on_mode_changed(&mut self, enable3d: bool) -> Result<()> {
+        self.logic.change_mode(enable3d)
     }
 }
