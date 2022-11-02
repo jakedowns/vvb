@@ -34,7 +34,7 @@ void main()
 }
 ";
 
-const FRAGMENT_SHADER: &str = "\
+const FRAGMENT_SHADER_4V: &str = "\
 precision mediump float;
 uniform vec4 u_Colors[2];
 uniform sampler2D u_Textures[2];
@@ -77,7 +77,7 @@ impl LeiaRenderLogic {
         let scale = settings.screen_zoom;
         let offset = -settings.vertical_offset;
         Self {
-            program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER),
+            program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER_2D),
             textures: Textures::new(2, (VB_WIDTH, VB_HEIGHT)),
 
             position_location: 0,
@@ -142,16 +142,20 @@ impl RenderLogic for LeiaRenderLogic {
     }
 
     fn change_mode(&mut self, enable3d: bool) -> Result<()> {
-        info!("change mode override {:?}",enable3d);
+        info!("leia change mode enable3d: {:?}",enable3d);
+        self.program.cleanup();
         if enable3d {
-            self.program.set_program(
-                VERTEX_SHADER,
-                FRAGMENT_SHADER)?;
+            self.program = Program::new(VERTEX_SHADER, FRAGMENT_SHADER_4V);
+            // self.program.set_program(
+            //     VERTEX_SHADER,
+            //     FRAGMENT_SHADER_4V)?;
         }else{
-            self.program.set_program(
-                VERTEX_SHADER,
-                FRAGMENT_SHADER_2D)?;
+            self.program = Program::new(VERTEX_SHADER, FRAGMENT_SHADER_2D);
+            // self.program.set_program(
+            //     VERTEX_SHADER,
+            //     FRAGMENT_SHADER_2D)?;
         }
+        self.init()?;
         Ok(())
     }
 }

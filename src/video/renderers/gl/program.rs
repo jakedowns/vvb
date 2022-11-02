@@ -4,7 +4,7 @@ use crate::video::gl::types::{
 };
 use crate::video::gl::utils::{check_error, temp_array, AsVoidptr};
 use anyhow::Result;
-use log::error;
+use log::{info,error};
 use std::ffi::{CStr, CString};
 
 const GL_TRUE: GLboolean = 1;
@@ -47,6 +47,7 @@ pub fn make_shader(type_: GLenum, source: &str) -> Result<GLuint> {
         check_error("load a shader's source")?;
         gl::CompileShader(shader_id);
         check_error("compile a shader")?;
+        info!("source {:?}",source);
         check_shader(type_, shader_id)?;
         Ok(shader_id)
     }
@@ -97,6 +98,8 @@ impl Program {
         unsafe {
             self.id = gl::CreateProgram();
             check_error("create a program")?;
+
+            info!("program init make_shader");
 
             let vertex_shader = make_shader(gl::VERTEX_SHADER, self.vertex_shader)?;
             gl::AttachShader(self.id, vertex_shader);
@@ -218,37 +221,37 @@ impl Program {
             check_error("render a texture")
         }
     }
-    pub fn set_program(&mut self, vertex_shader: &'static str, fragment_shader: &'static str) -> Result<()> {
-        unsafe {
-            // delete old shader program
-            if gl::IsProgram(self.id) == GL_TRUE {
-                gl::DeleteProgram(self.id)
-            }
-
-            self.vertex_shader = vertex_shader;
-            self.fragment_shader = fragment_shader;
-
-            // init new shader program
-            self.id = gl::CreateProgram();
-            check_error("create a program")?;
-
-            let vertex_shader = make_shader(gl::VERTEX_SHADER, self.vertex_shader)?;
-            gl::AttachShader(self.id, vertex_shader);
-            check_error("attach the vertex shader")?;
-
-            let fragment_shader = make_shader(gl::FRAGMENT_SHADER, self.fragment_shader)?;
-            gl::AttachShader(self.id, fragment_shader);
-            check_error("attach the fragment shader")?;
-
-            gl::LinkProgram(self.id);
-            check_error("link a program")?;
-            gl::UseProgram(self.id);
-            check_error("use a program")?;
-
-            Ok(())
-        }
-    }
-    fn cleanup(&mut self) -> Result<()> {
+    // pub fn set_program(&mut self, vertex_shader: &'static str, fragment_shader: &'static str) -> Result<()> {
+    //     unsafe {
+    //         // delete old shader program
+    //         if gl::IsProgram(self.id) == GL_TRUE {
+    //             gl::DeleteProgram(self.id)
+    //         }
+    //
+    //         self.vertex_shader = vertex_shader;
+    //         self.fragment_shader = fragment_shader;
+    //
+    //         // init new shader program
+    //         self.id = gl::CreateProgram();
+    //         check_error("create a program")?;
+    //
+    //         let vertex_shader = make_shader(gl::VERTEX_SHADER, vertex_shader)?;
+    //         gl::AttachShader(self.id, vertex_shader);
+    //         check_error("attach the vertex shader")?;
+    //
+    //         let fragment_shader = make_shader(gl::FRAGMENT_SHADER, fragment_shader)?;
+    //         gl::AttachShader(self.id, fragment_shader);
+    //         check_error("attach the fragment shader")?;
+    //
+    //         gl::LinkProgram(self.id);
+    //         check_error("link a program")?;
+    //         gl::UseProgram(self.id);
+    //         check_error("use a program")?;
+    //
+    //         Ok(())
+    //     }
+    // }
+    pub fn cleanup(&mut self) -> Result<()> {
         unsafe {
             if gl::IsProgram(self.id) == GL_TRUE {
                 gl::DeleteProgram(self.id)
