@@ -4,7 +4,7 @@ use crate::video::gl::types::{
 };
 use crate::video::gl::utils::{check_error, temp_array, AsVoidptr};
 use anyhow::Result;
-use log::{info,error};
+use log::{error};
 use std::ffi::{CStr, CString};
 
 const GL_TRUE: GLboolean = 1;

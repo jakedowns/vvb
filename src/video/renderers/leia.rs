@@ -103,23 +103,18 @@ impl LeiaRenderLogic {
         }
     }
 
-    fn actually_change_mode(&mut self){
+    fn maybe_change_mode(&mut self){
+        // already in the requested mode
         if self.enable3d == self.requested_enable3d {
             return
         }
 
         self.enable3d = self.requested_enable3d;
-        log::info!("change mode");
+
         if self.enable3d {
             self.program.set_uniform_int(self.enable3d_location, 1 as GLint);
-        //     self.program
-        //         .set_uniform_texture_array(self.textures_location, &self.textures.ids);
         } else {
             self.program.set_uniform_int(self.enable3d_location, 0 as GLint);
-        //     //log::info!("texture ids {:?} {:?}",self.textures.ids[0],self.textures.ids[1]);
-        //     // repeated left eye texture pointer in 2d mode
-        //     self.program
-        //         .set_uniform_texture_array(self.textures_location, self.texture_ids_2d.as_slice());
         }
     }
 }
@@ -166,7 +161,7 @@ impl RenderLogic for LeiaRenderLogic {
     }
 
     fn update(&mut self, eye: Eye, buffer: &[u8]) -> Result<()> {
-        self.actually_change_mode();
+        self.maybe_change_mode();
         self.textures.update(eye as usize, buffer)
     }
     fn draw(&self) -> Result<()> {
@@ -175,11 +170,8 @@ impl RenderLogic for LeiaRenderLogic {
             .draw_square(self.position_location, self.tex_coord_location)
     }
 
-    // actually just requests we swap on next draw call
-    fn change_mode(&mut self, enable3d: bool) -> Result<()> {
+    fn request_change_mode(&mut self, enable3d: bool) -> Result<()> {
         self.requested_enable3d = enable3d; // flag mailbox
-
-
         Ok(())
     }
 }
