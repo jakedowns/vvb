@@ -240,44 +240,6 @@ impl Program {
             check_error("render a texture")
         }
     }
-    // pub fn set_program(&mut self, vertex_shader: &'static str, fragment_shader: &'static str) -> Result<()> {
-    //     unsafe {
-    //         info!("delete program");
-    //         // delete old shader program
-    //         if gl::IsProgram(self.id) == GL_TRUE {
-    //             gl::DeleteProgram(self.id)
-    //         }
-    //
-    //         info!("reassign vert/frag");
-    //         self.vertex_shader = vertex_shader;
-    //         self.fragment_shader = fragment_shader;
-    //
-    //         info!("create program");
-    //         // init new shader program
-    //         self.id = gl::CreateProgram();
-    //         check_error("create a program")?;
-    //
-    //         info!("before make vert shader");
-    //         let vertex_shader = make_shader(gl::VERTEX_SHADER, vertex_shader)?;
-    //         gl::AttachShader(self.id, vertex_shader);
-    //         check_error("attach the vertex shader")?;
-    //
-    //         info!("before make frag shader");
-    //         let fragment_shader = make_shader(gl::FRAGMENT_SHADER, fragment_shader)?;
-    //         gl::AttachShader(self.id, fragment_shader);
-    //         check_error("attach the fragment shader")?;
-    //
-    //         info!("before link");
-    //         gl::LinkProgram(self.id);
-    //         check_error("link a program")?;
-    //
-    //         info!("before use");
-    //         gl::UseProgram(self.id);
-    //         check_error("use a program")?;
-    //
-    //         Ok(())
-    //     }
-    // }
     pub fn cleanup(&mut self) -> Result<()> {
         unsafe {
             if gl::IsProgram(self.id) == GL_TRUE {
