@@ -6,7 +6,9 @@ pub trait RenderLogic {
     fn resize(&mut self, screen_size: (i32, i32)) -> Result<()>;
     fn update(&mut self, eye: Eye, buffer: &[u8]) -> Result<()>;
     fn draw(&self) -> Result<()>;
+    fn request_change_mode(&mut self, _enable3d: bool) -> Result<()> {Ok(())}
 }
+
 
 pub struct Renderer<TLogic: RenderLogic> {
     frame_buffers: FrameBufferConsumers,
@@ -41,5 +43,10 @@ impl<TLogic: RenderLogic> Renderer<TLogic> {
                 log::error!("Error updating eye!");
             }
         });
+    }
+
+    pub fn on_mode_changed(&mut self, enable3d: bool) -> Result<()> {
+        self.logic.request_change_mode(enable3d)?;
+        Ok(())
     }
 }

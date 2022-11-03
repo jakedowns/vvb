@@ -4,7 +4,7 @@ use crate::video::gl::types::{
 };
 use crate::video::gl::utils::{check_error, temp_array, AsVoidptr};
 use anyhow::Result;
-use log::error;
+use log::{error};
 use std::ffi::{CStr, CString};
 
 const GL_TRUE: GLboolean = 1;
@@ -66,10 +66,21 @@ unsafe fn check_shader(type_: GLenum, shader_id: GLuint) -> Result<()> {
     if length < 0 {
         return Err(anyhow::anyhow!("Invalid shader info log length"));
     }
+
     let mut buf = vec![0; length as usize];
     let buf_ptr = buf.as_mut_ptr() as *mut GLchar;
     gl::GetShaderInfoLog(shader_id, length, std::ptr::null_mut(), buf_ptr);
-    let cstr = CStr::from_bytes_with_nul(buf.as_slice())?;
+
+    let last_ch = buf.as_slice().last().unwrap();
+    let buff_slice = buf.as_slice();
+    let null_ptr_slice = [0u8; 1].as_slice();
+    let concatenated = [&buff_slice,null_ptr_slice].concat();
+    let buff_slice_with_null = concatenated.as_slice();
+    let cstr = if last_ch != &0u8 {
+        CStr::from_bytes_with_nul(buff_slice)?
+    } else {
+        CStr::from_bytes_with_nul(buff_slice_with_null)?
+    };
 
     let log = cstr.to_str()?;
     Err(anyhow::anyhow!(
@@ -98,14 +109,13 @@ impl Program {
             self.id = gl::CreateProgram();
             check_error("create a program")?;
 
+
             let vertex_shader = make_shader(gl::VERTEX_SHADER, self.vertex_shader)?;
             gl::AttachShader(self.id, vertex_shader);
             check_error("attach the vertex shader")?;
-
             let fragment_shader = make_shader(gl::FRAGMENT_SHADER, self.fragment_shader)?;
             gl::AttachShader(self.id, fragment_shader);
             check_error("attach the fragment shader")?;
-
             gl::LinkProgram(self.id);
             check_error("link a program")?;
             gl::UseProgram(self.id);
@@ -172,6 +182,12 @@ impl Program {
         }
     }
 
+    pub fn set_uniform_int(&self, location: GLint, value: GLint) {
+        unsafe {
+            gl::Uniform1i(location, value);
+        }
+    }
+
     pub fn start_render(&self) -> Result<()> {
         unsafe {
             gl::ClearColor(0.0, 0.0, 0.0, 1.0);
@@ -218,7 +234,7 @@ impl Program {
             check_error("render a texture")
         }
     }
-    fn cleanup(&mut self) -> Result<()> {
+    pub fn cleanup(&mut self) -> Result<()> {
         unsafe {
             if gl::IsProgram(self.id) == GL_TRUE {
                 gl::DeleteProgram(self.id)

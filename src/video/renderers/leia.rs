@@ -7,6 +7,7 @@ use super::gl::{
 };
 use crate::video::gl::types::{GLfloat, GLint, GLuint};
 use anyhow::Result;
+// use log::{info};
 use cgmath::{vec3, Matrix4};
 
 const VERTEX_SHADER: &str = "\
@@ -20,14 +21,20 @@ void main() {
 }
 ";
 
-const FRAGMENT_SHADER: &str = "\
+const FRAGMENT_SHADER_4V: &str = "\
 precision mediump float;
 uniform vec4 u_Colors[2];
 uniform sampler2D u_Textures[2];
 varying vec2 v_TexCoord;
+uniform int u_enable_3d;
 
 void main()
 {
+    if (u_enable_3d==0){
+        gl_FragColor = texture2D(u_Textures[0], v_TexCoord);
+        gl_FragColor = mix(u_Colors[1], u_Colors[0], gl_FragColor.g);
+        return;
+    }
     //  + alignment_offset
     float view_id = mod(floor(gl_FragCoord.x), 4.0);
     if (view_id < 0.5) { gl_FragColor = texture2D(u_Textures[0], v_TexCoord); }
@@ -48,11 +55,19 @@ pub struct LeiaRenderLogic {
     program: Program,
     textures: Textures,
 
+    texture_ids_2d: Vec<GLuint>,
+
+    // mailbox?
+    requested_enable3d: bool,
+    enable3d: bool,
+
+
     position_location: GLuint,
     tex_coord_location: GLuint,
     modelview_location: GLint,
     textures_location: GLint,
     colors_location: GLint,
+    enable3d_location: GLint,
 
     texture_colors: [[GLfloat; 4]; 2],
     aspect_ratio: AspectRatio,
@@ -63,14 +78,20 @@ impl LeiaRenderLogic {
         let scale = settings.screen_zoom;
         let offset = -settings.vertical_offset;
         Self {
-            program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER),
+            program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER_4V),
             textures: Textures::new(2, (VB_WIDTH, VB_HEIGHT)),
+
+            texture_ids_2d: vec![0,0],
+
+            requested_enable3d: false,
+            enable3d: false,
 
             position_location: 0,
             tex_coord_location: 0,
             modelview_location: -1,
             textures_location: -1,
             colors_location: -1,
+            enable3d_location: 0,
 
             texture_colors: [
                 utils::color_as_vector(settings.colors[0]),
@@ -79,6 +100,21 @@ impl LeiaRenderLogic {
             aspect_ratio: settings.aspect_ratio,
             transform: Matrix4::from_translation(vec3(0.0, offset, 0.0))
                 * Matrix4::from_scale(scale),
+        }
+    }
+
+    fn maybe_change_mode(&mut self){
+        // already in the requested mode
+        if self.enable3d == self.requested_enable3d {
+            return
+        }
+
+        self.enable3d = self.requested_enable3d;
+
+        if self.enable3d {
+            self.program.set_uniform_int(self.enable3d_location, 1 as GLint);
+        } else {
+            self.program.set_uniform_int(self.enable3d_location, 0 as GLint);
         }
     }
 }
@@ -92,6 +128,12 @@ impl RenderLogic for LeiaRenderLogic {
         self.modelview_location = self.program.get_uniform_location("u_MV");
         self.textures_location = self.program.get_uniform_location("u_Textures");
         self.colors_location = self.program.get_uniform_location("u_Colors");
+        self.enable3d_location = self.program.get_uniform_location("u_enable_3d");
+
+        // repeated left eye texture pointer in 2d mode (not working :G)
+        self.texture_ids_2d = vec![self.textures.ids[0],self.textures.ids[0]];
+
+        self.program.set_uniform_int(self.enable3d_location, 1 as GLint);
 
         // textures and colors don't change, set them here
         self.program
@@ -119,12 +161,18 @@ impl RenderLogic for LeiaRenderLogic {
     }
 
     fn update(&mut self, eye: Eye, buffer: &[u8]) -> Result<()> {
+        self.maybe_change_mode();
         self.textures.update(eye as usize, buffer)
     }
     fn draw(&self) -> Result<()> {
         self.program.start_render()?;
         self.program
             .draw_square(self.position_location, self.tex_coord_location)
+    }
+
+    fn request_change_mode(&mut self, enable3d: bool) -> Result<()> {
+        self.requested_enable3d = enable3d; // flag mailbox
+        Ok(())
     }
 }
 
@@ -143,7 +191,7 @@ pub mod jni {
     use crate::video::renderers::common::Renderer;
     use crate::{jni_func, jni_helpers};
     use anyhow::Result;
-    use jni::sys::{jint, jobject};
+    use jni::sys::{jboolean, jint, jobject};
     use jni::JNIEnv;
 
     type LeiaRenderer = Renderer<LeiaRenderLogic>;
@@ -208,5 +256,11 @@ pub mod jni {
     fn on_draw_frame(env: &JNIEnv, this: jobject) -> Result<()> {
         let mut this = get_renderer(env, this)?;
         this.on_draw_frame()
+    }
+
+    jni_func!(LeiaRenderer_nativeOnModeChanged, on_mode_changed, jboolean);
+    fn on_mode_changed(env: &JNIEnv, this: jobject, enable3d: jboolean) -> Result<()> {
+        let mut this = get_renderer(env, this)?;
+        this.on_mode_changed(enable3d != 0)
     }
 }
