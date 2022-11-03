@@ -43,15 +43,11 @@ pub fn make_shader(type_: GLenum, source: &str) -> Result<GLuint> {
         let shader_str = c_string!(source);
         let shader_arr = [shader_str.as_ptr()];
         let shader_source = shader_arr.as_ptr();
-        info!("before load shader source");
         gl::ShaderSource(shader_id, 1, shader_source, std::ptr::null());
         check_error("load a shader's source")?;
         gl::CompileShader(shader_id);
         check_error("compile a shader")?;
-        info!("source {:?}",source);
-        info!("before check_shader");
         check_shader(type_, shader_id)?;
-        info!("after check_shader");
         Ok(shader_id)
     }
 }
@@ -59,7 +55,6 @@ pub fn make_shader(type_: GLenum, source: &str) -> Result<GLuint> {
 unsafe fn check_shader(type_: GLenum, shader_id: GLuint) -> Result<()> {
     let status = temp_array(|ptr| gl::GetShaderiv(shader_id, gl::COMPILE_STATUS, ptr)) as GLboolean;
     check_error("checking compile status of a shader")?;
-    info!("compile status {:?}",status);
     if status == GL_TRUE {
         return Ok(());
     }
@@ -67,7 +62,6 @@ unsafe fn check_shader(type_: GLenum, shader_id: GLuint) -> Result<()> {
     let length = temp_array(|ptr| {
         gl::GetShaderiv(shader_id, gl::INFO_LOG_LENGTH, ptr);
     });
-    info!("shader len {:?}",length);
     check_error("finding info log length for a shader")?;
     if length < 0 {
         return Err(anyhow::anyhow!("Invalid shader info log length"));
@@ -78,7 +72,6 @@ unsafe fn check_shader(type_: GLenum, shader_id: GLuint) -> Result<()> {
     gl::GetShaderInfoLog(shader_id, length, std::ptr::null_mut(), buf_ptr);
 
     let last_ch = buf.as_slice().last().unwrap();
-    info!("last_ch {:?}",last_ch);
     let buff_slice = buf.as_slice();
     let null_ptr_slice = [0u8; 1].as_slice();
     let concatenated = [&buff_slice,null_ptr_slice].concat();
@@ -116,22 +109,17 @@ impl Program {
             self.id = gl::CreateProgram();
             check_error("create a program")?;
 
-            info!("program init make_shader");
 
             let vertex_shader = make_shader(gl::VERTEX_SHADER, self.vertex_shader)?;
             gl::AttachShader(self.id, vertex_shader);
             check_error("attach the vertex shader")?;
-            info!("after make vertex shader");
             let fragment_shader = make_shader(gl::FRAGMENT_SHADER, self.fragment_shader)?;
             gl::AttachShader(self.id, fragment_shader);
             check_error("attach the fragment shader")?;
-            info!("after make/attach frag shader");
             gl::LinkProgram(self.id);
             check_error("link a program")?;
-            info!("after link program");
             gl::UseProgram(self.id);
             check_error("use a program")?;
-            info!("after use program");
 
             Ok(())
         }
@@ -191,6 +179,12 @@ impl Program {
             }
             let slots: Vec<GLint> = (0..ids.len() as GLint).collect();
             gl::Uniform1iv(location, slots.len() as GLsizei, slots.as_ptr());
+        }
+    }
+
+    pub fn set_uniform_int(&self, location: GLint, value: GLint) {
+        unsafe {
+            gl::Uniform1i(location, value);
         }
     }
 

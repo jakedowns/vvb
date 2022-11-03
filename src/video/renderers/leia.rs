@@ -7,7 +7,7 @@ use super::gl::{
 };
 use crate::video::gl::types::{GLfloat, GLint, GLuint};
 use anyhow::Result;
-use log::{info};
+// use log::{info};
 use cgmath::{vec3, Matrix4};
 
 const VERTEX_SHADER: &str = "\
@@ -26,9 +26,15 @@ precision mediump float;
 uniform vec4 u_Colors[2];
 uniform sampler2D u_Textures[2];
 varying vec2 v_TexCoord;
+uniform int u_enable_3d;
 
 void main()
 {
+    if (u_enable_3d==0){
+        gl_FragColor = texture2D(u_Textures[0], v_TexCoord);
+        gl_FragColor = mix(u_Colors[1], u_Colors[0], gl_FragColor.g);
+        return;
+    }
     //  + alignment_offset
     float view_id = mod(floor(gl_FragCoord.x), 4.0);
     if (view_id < 0.5) { gl_FragColor = texture2D(u_Textures[0], v_TexCoord); }
@@ -49,13 +55,19 @@ pub struct LeiaRenderLogic {
     program: Program,
     textures: Textures,
 
+    texture_ids_2d: Vec<GLuint>,
+
+    // mailbox?
+    requested_enable3d: bool,
     enable3d: bool,
+
 
     position_location: GLuint,
     tex_coord_location: GLuint,
     modelview_location: GLint,
     textures_location: GLint,
     colors_location: GLint,
+    enable3d_location: GLint,
 
     texture_colors: [[GLfloat; 4]; 2],
     aspect_ratio: AspectRatio,
@@ -69,6 +81,9 @@ impl LeiaRenderLogic {
             program: Program::new(VERTEX_SHADER, FRAGMENT_SHADER_4V),
             textures: Textures::new(2, (VB_WIDTH, VB_HEIGHT)),
 
+            texture_ids_2d: vec![0,0],
+
+            requested_enable3d: false,
             enable3d: false,
 
             position_location: 0,
@@ -76,6 +91,7 @@ impl LeiaRenderLogic {
             modelview_location: -1,
             textures_location: -1,
             colors_location: -1,
+            enable3d_location: 0,
 
             texture_colors: [
                 utils::color_as_vector(settings.colors[0]),
@@ -84,6 +100,26 @@ impl LeiaRenderLogic {
             aspect_ratio: settings.aspect_ratio,
             transform: Matrix4::from_translation(vec3(0.0, offset, 0.0))
                 * Matrix4::from_scale(scale),
+        }
+    }
+
+    fn actually_change_mode(&mut self){
+        if self.enable3d == self.requested_enable3d {
+            return
+        }
+
+        self.enable3d = self.requested_enable3d;
+        log::info!("change mode");
+        if self.enable3d {
+            self.program.set_uniform_int(self.enable3d_location, 1 as GLint);
+        //     self.program
+        //         .set_uniform_texture_array(self.textures_location, &self.textures.ids);
+        } else {
+            self.program.set_uniform_int(self.enable3d_location, 0 as GLint);
+        //     //log::info!("texture ids {:?} {:?}",self.textures.ids[0],self.textures.ids[1]);
+        //     // repeated left eye texture pointer in 2d mode
+        //     self.program
+        //         .set_uniform_texture_array(self.textures_location, self.texture_ids_2d.as_slice());
         }
     }
 }
@@ -97,6 +133,12 @@ impl RenderLogic for LeiaRenderLogic {
         self.modelview_location = self.program.get_uniform_location("u_MV");
         self.textures_location = self.program.get_uniform_location("u_Textures");
         self.colors_location = self.program.get_uniform_location("u_Colors");
+        self.enable3d_location = self.program.get_uniform_location("u_enable_3d");
+
+        // repeated left eye texture pointer in 2d mode (not working :G)
+        self.texture_ids_2d = vec![self.textures.ids[0],self.textures.ids[0]];
+
+        self.program.set_uniform_int(self.enable3d_location, 1 as GLint);
 
         // textures and colors don't change, set them here
         self.program
@@ -124,11 +166,8 @@ impl RenderLogic for LeiaRenderLogic {
     }
 
     fn update(&mut self, eye: Eye, buffer: &[u8]) -> Result<()> {
-        let mut used_eye = eye;
-        if !self.enable3d && eye == Eye::Right {
-            used_eye = Eye::Left;
-        }
-        self.textures.update(used_eye as usize, buffer)
+        self.actually_change_mode();
+        self.textures.update(eye as usize, buffer)
     }
     fn draw(&self) -> Result<()> {
         self.program.start_render()?;
@@ -136,14 +175,10 @@ impl RenderLogic for LeiaRenderLogic {
             .draw_square(self.position_location, self.tex_coord_location)
     }
 
+    // actually just requests we swap on next draw call
     fn change_mode(&mut self, enable3d: bool) -> Result<()> {
-        self.enable3d = enable3d;
+        self.requested_enable3d = enable3d; // flag mailbox
 
-        if enable3d {
-
-        } else {
-
-        }
 
         Ok(())
     }
